@@ -16,6 +16,8 @@ The data Visualization in real-time it is available in ThingsBoard Platform
 * Spark stream 
 * Simple Queue Service
 
+<img height="700" src="https://github.com/caaiofarias/PISIIV-BSI/blob/main/logo.png">
+
 ## Getting started
   To run the project:
   This project was made to fire an event each day, using the [easy-cron](https://www.easycron.com). 
