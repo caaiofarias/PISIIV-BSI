@@ -1,0 +1,58 @@
+1.verificar se o cluster tem permissão do kinesis
+caso não tenha adicionar nas funções a política do kinesisFullAccess
+
+2. Porta ssh nas políticas de segurança do master e do slave (adcionar entrada -> tipo de protocolo ssh -> origem meu ip)
+fazer no master e slave
+
+3. instalar boto3 no master e nos slaves via pip
+
+ssh pro master que funciona 
+aws emr ssh --cluster-id ID DO CLUSTER --key-pair-file ~/Downloads/kinesisPair.pem
+
+
+logar nos slaves
+ssh hadoop@ip-do-ec2-slave -i ~/Downloads/kinesisPair.pem
+ssh hadoop@ec2-34-201-245-54.compute-1.amazonaws.com -i ~/Downloads/kinesisPair.pem
+
+vendo os jobs no cluster via yarn 
+yarn application -list
+
+precisei terminar os outros jobs pq so pode rodar um 
+yarn application -kill application_1602274583626_0001
+
+
+
+nomes dos serviços:
+
+kinesisStream: stream-heat-index
+sqs: MyQueue
+clonar ultimo cluster
+
+adicionando bootstrap action p instalar boto3 em cada maquina do cluster:
+    sobe o .sh pro s3 e coloca a flag boostrap-actions [caminhodoshnos3]
+criando cluster 
+
+aws emr create-cluster --applications Name=Spark Name=Zeppelin --ec2-attributes '{"KeyName":"kinesisPair","InstanceProfile":"EMR_EC2_DefaultRole","SubnetId":"subnet-c5ae1a9a","EmrManagedSlaveSecurityGroup":"sg-018c9d950307c7ae5","EmrManagedMasterSecurityGroup":"sg-05b16b8a6a349ab38"}' --release-label emr-5.31.0 --log-uri 's3n://aws-logs-687638469357-us-east-1/elasticmapreduce/' --steps '[{"Args":["spark-submit","--deploy-mode","client","--jars","TestSpark","s3://kinesistestcaiof/sparkKinesis.py","kinesis-sql","stream-heat-index","https://kinesis.us-east-1.amazonaws.com","us-east-1"],"Type":"CUSTOM_JAR","ActionOnFailure":"CONTINUE","Jar":"command-runner.jar","Properties":"","Name":"KINESIS"},{"Args":["spark-submit","--jars","s3://kinesistestcaiof/spark-sql-kinesis_2.11-1.2.1_spark-2.4-SNAPSHOT.jar","s3://kinesistestcaiof/kinesis_example.py","stream-heat-index","stream-heat-index","https://kinesis.us-east-1.amazonaws.com","us-east-1"],"Type":"CUSTOM_JAR","ActionOnFailure":"CONTINUE","Jar":"command-runner.jar","Properties":"","Name":"Kinesis-SQL"},{"Args":["spark-submit","--jars","s3://kinesistestcaiof/spark-sql-kinesis_2.11-1.2.1_spark-2.4-SNAPSHOT.jar","s3://kinesistestcaiof/kinesis_example.py","stream-heat-index","stream-heat-index","https://kinesis.us-east-1.amazonaws.com","us-east-1"],"Type":"CUSTOM_JAR","ActionOnFailure":"CONTINUE","Jar":"command-runner.jar","Properties":"","Name":"Kinesis-SQL"}]' --instance-groups '[{"InstanceCount":1,"EbsConfiguration":{"EbsBlockDeviceConfigs":[{"VolumeSpecification":{"SizeInGB":32,"VolumeType":"gp2"},"VolumesPerInstance":2}]},"InstanceGroupType":"MASTER","InstanceType":"m5.xlarge","Name":"Master Instance Group"},{"InstanceCount":2,"EbsConfiguration":{"EbsBlockDeviceConfigs":[{"VolumeSpecification":{"SizeInGB":32,"VolumeType":"gp2"},"VolumesPerInstance":2}]},"InstanceGroupType":"CORE","InstanceType":"m5.xlarge","Name":"Core Instance Group"}]' --bootstrap-actions '[{"Path":"s3://kinesistestcaiof/install-boto3.sh","Args":["instance.isMaster=true","echo","Running","on","master","node"],"Name":"Ação personalizada"}]' --ebs-root-volume-size 10 --service-role EMR_DefaultRole --enable-debugging --name 'Meu cluster' --scale-down-behavior TERMINATE_AT_TASK_COMPLETION --region us-east-1
+
+add-step no cluster: 
+aws emr add-steps --cluster-id j-3LES8DL3FFARC --steps Type=Spark,Name="Kinesis-SQL",ActionOnFailure=CONTINUE,Args=[--jars,s3://kinesistestcaiof/spark-sql-kinesis_2.11-1.2.1_spark-2.4-SNAPSHOT.jar,s3://kinesistestcaiof/kinesis_example.py,stream-heat-index,stream-heat-index,https://kinesis.us-east-1.amazonaws.com,us-east-1]
+
+
+
+subindo uma função lambda com dependencia adicional 
+
+pip3 install --target ./package simplejson
+cd package
+sudo zip -r9 ${OLDPWD}/function.zip .
+cd ..
+sudo zip -g function.zip lambda_function.py
+aws lambda update-function-code --function-name sendDataToThingsBoard --zip-file fileb://function.zip
+
+
+criar api gateway com deployment staged
+aws apigateway create-deployment --region us-east-1 --rest-api-id ttspk4cbk8 --stage-name prod
+
+invocar url:
+https://mugb7isen4.execute-api.us-east-1.amazonaws.com/prod
+
+    
